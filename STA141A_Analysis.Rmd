@@ -1,0 +1,141 @@
+---
+title: "STA141A Final Analysis"
+author: "Tuomas Rickansrud"
+date: '2022-06-05'
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+country_indicators = read.csv("country_indicators.csv")
+pirate_attacks = read.csv("pirate_attacks.csv")
+country_codes = read.csv("country_codes.csv")
+
+names(country_indicators)[5] = "GDP_per_capita" 
+```
+
+```{r}
+pay = pirate_attacks
+pay$date = strtrim(pay$date, 4)
+```
+
+```{r}
+clean.pay = na.omit(pay[,c(-2, -12, -13, -14)])
+clean.ci = country_indicators[complete.cases(country_indicators$year),]
+fpay = merge(clean.pay, clean.ci, by.x = c("date", "nearest_country"), by.y = c("year", "country"))
+```
+
+```{r}
+num_attacks = c()
+for (country in unique(na.omit(country_indicators$country))){
+  for (year in na.omit(country_indicators[country_indicators$country == country,]$year)){
+
+    num_attacks = append(num_attacks, nrow(clean.pay[clean.pay$date == year & clean.pay$nearest_country == country,]))
+  }
+}
+```
+
+```{r}
+ci.attacks = cbind(clean.ci, num_attacks)
+clean.cia = na.omit(ci.attacks)
+clean.cia$year = factor(clean.cia$year)
+```
+
+```{r}
+for (year in na.omit(unique(pay$year))){
+  print(c(year, nrow(pay[pay$date == year,])))
+}
+```
+
+```{r}
+sort(table(clean.pay$nearest_country), decreasing = T)
+```
+
+```{r}
+IDN.year = c()
+IDN_num = c()
+for (year in na.omit(unique(clean.pay$date))){
+  IDN.year = append(IDN.year, year)
+  IDN_num = append(IDN_num, nrow(clean.pay[clean.pay$date == year & clean.pay$nearest_country == "IDN",]))
+}
+IDN.m = cbind(IDN.year, IDN_num)
+```
+
+```{r}
+testing = cbind(clean.ci[clean.ci$country == "IDN",], IDN_num)
+```
+
+```{r}
+cor(clean.cia[,c(-1,-2,-6,-8,-5)])
+```
+
+```{r}
+mod = lm(num_attacks~., data = clean.cia[,c(-1,-2,-6,-8,-5)])
+summary(mod)
+```
+
+```{r}
+plot(mod)
+shapiro.test(rstandard(mod))
+```
+
+
+```{r}
+wt = 1 / lm(abs(mod$residuals)~mod$fitted.values)$fitted.values^2
+
+wt.mod = lm(num_attacks~., data = clean.cia[,c(-1,-2,-6,-8,-5)], weights = wt)
+```
+
+```{r}
+summary(wt.mod)
+```
+
+```{r}
+library(car)
+durbinWatsonTest(mod)
+```
+
+```{r}
+plot(mod)
+```
+
+```{r}
+library(lmtest)
+bptest(mod)
+```
+
+```{r}
+library(MASS)
+step.mod = stepAIC(mod, direction = "both", trace = F)
+```
+
+```{r}
+summary(step.mod)
+```
+
+```{r}
+plot(step.mod)
+```
+
+```{r}
+library(GGally)
+ggpairs(ci.attacks[,-1])
+```
+
+```{r}
+library(car)
+durbinWatsonTest(wt.mod)
+```
+```{r}
+colSums(is.na(clean.ci))
+```
+
+```{r}
+boxplot(fpay$total_military, horizontal = T)
+
+```
+
+
